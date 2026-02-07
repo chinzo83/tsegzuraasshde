@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Navbar } from "@/components/navbar"
+import { ClerkProvider } from "@clerk/nextjs"
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -35,15 +36,17 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
-      >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Navbar />
-          <main className="min-h-[calc(100vh-3.5rem)]">{children}</main>
-        </ThemeProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body
+          className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        >
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <Navbar />
+            <main className="min-h-[calc(100vh-3.5rem)]">{children}</main>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

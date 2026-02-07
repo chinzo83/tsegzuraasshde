@@ -4,9 +4,10 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Menu, X, Radio } from "lucide-react"
+import { Menu, X, Radio, User } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
 
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
@@ -50,6 +51,23 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <SignedIn>
+            <Link href="/profile">
+              <Button variant="ghost" size="sm" className="gap-2 text-sm">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">Profile</span>
+              </Button>
+            </Link>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+          <SignedOut>
+            <Link href="/sign-in">
+              <Button variant="outline" size="sm" className="gap-2 text-sm">
+                <User className="h-4 w-4" />
+                Sign In
+              </Button>
+            </Link>
+          </SignedOut>
           <ThemeToggle />
           <Button
             variant="ghost"
@@ -81,6 +99,15 @@ export function Navbar() {
                 {item.label}
               </Link>
             ))}
+            <SignedOut>
+              <Link
+                href="/sign-in"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-md px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+              >
+                Sign In
+              </Link>
+            </SignedOut>
           </div>
         </nav>
       )}
