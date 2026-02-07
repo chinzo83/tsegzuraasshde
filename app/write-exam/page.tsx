@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
-import { getRandomChars, MORSE_CODE, REVERSE_MORSE } from "@/lib/morse"
+import { useState, useRef, useCallback, useEffect } from "react"
+import { getRandomChars, REVERSE_MORSE } from "@/lib/morse"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { PenTool, Play, RotateCcw, ArrowLeft, Minus, Circle } from "lucide-react"
@@ -15,7 +15,9 @@ export default function WriteExamPage() {
   const [chars, setChars] = useState<string[]>([])
   const [currentCharIndex, setCurrentCharIndex] = useState(0)
   const [morseInput, setMorseInput] = useState("")
-  const [results, setResults] = useState<Array<{ char: string; input: string; decoded: string; correct: boolean }>>([])
+  const [results, setResults] = useState<
+    Array<{ char: string; input: string; decoded: string; correct: boolean }>
+  >([])
   const [examStarted, setExamStarted] = useState(false)
   const [examComplete, setExamComplete] = useState(false)
   const [startTime, setStartTime] = useState(0)
@@ -47,7 +49,10 @@ export default function WriteExamPage() {
           const correct = decoded === expected
 
           setResults((r) => {
-            const newResults = [...r, { char: expected, input: prev, decoded, correct }]
+            const newResults = [
+              ...r,
+              { char: expected, input: prev, decoded, correct },
+            ]
 
             if (currentCharIndex + 1 >= chars.length) {
               setExamComplete(true)
@@ -66,10 +71,40 @@ export default function WriteExamPage() {
     [chars, currentCharIndex, examComplete]
   )
 
-  const accuracy = results.length > 0
-    ? Math.round((results.filter((r) => r.correct).length / results.length) * 100)
-    : 0
-  const timeSpent = endTime && startTime ? ((endTime - startTime) / 1000).toFixed(1) : "0"
+  // Keyboard support: q or . for dot, w or - for dash
+  useEffect(() => {
+    if (!examStarted || examComplete) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "q" || e.key === "." || e.key === "Q") {
+        e.preventDefault()
+        addSymbol(".")
+      } else if (e.key === "w" || e.key === "-" || e.key === "W") {
+        e.preventDefault()
+        addSymbol("-")
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [examStarted, examComplete, addSymbol])
+
+  const accuracy =
+    results.length > 0
+      ? Math.round(
+          (results.filter((r) => r.correct).length / results.length) * 100
+        )
+      : 0
+  const timeSpent =
+    endTime && startTime ? ((endTime - startTime) / 1000).toFixed(1) : "0"
+  const wpmScore =
+    endTime && startTime
+      ? Math.round(
+          (results.filter((r) => r.correct).length /
+            ((endTime - startTime) / 1000)) *
+            12
+        )
+      : 0
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
@@ -87,7 +122,9 @@ export default function WriteExamPage() {
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="mb-6">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-card-foreground">Speed</span>
+              <span className="text-sm font-medium text-card-foreground">
+                Speed
+              </span>
               <span className="font-mono text-sm text-primary">{wpm} WPM</span>
             </div>
             <Slider
@@ -98,6 +135,17 @@ export default function WriteExamPage() {
               value={[wpm]}
               onValueChange={(v) => setWpm(v[0])}
             />
+          </div>
+          <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground mb-6">
+            <p className="font-medium text-foreground mb-1">Keyboard shortcuts</p>
+            <p>
+              <kbd className="rounded bg-background px-1.5 py-0.5 text-xs font-mono border">q</kbd> or{" "}
+              <kbd className="rounded bg-background px-1.5 py-0.5 text-xs font-mono border">.</kbd> = dot
+              &nbsp;&nbsp;
+              <kbd className="rounded bg-background px-1.5 py-0.5 text-xs font-mono border">w</kbd> or{" "}
+              <kbd className="rounded bg-background px-1.5 py-0.5 text-xs font-mono border">-</kbd> = dash
+            </p>
+            <p className="mt-1">No hints shown during exam. Rely on your Morse knowledge!</p>
           </div>
           <div className="flex justify-center">
             <Button onClick={startExam} className="gap-2">
@@ -115,7 +163,9 @@ export default function WriteExamPage() {
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${(currentCharIndex / EXAM_COUNT) * 100}%` }}
+                style={{
+                  width: `${(currentCharIndex / EXAM_COUNT) * 100}%`,
+                }}
               />
             </div>
             <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -123,13 +173,13 @@ export default function WriteExamPage() {
             </p>
           </div>
 
-          {/* Current char */}
+          {/* Current char - NO expected Morse shown (anti-cheat) */}
           <div className="mb-6 flex flex-col items-center gap-2">
             <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-2 border-primary bg-primary/10 text-3xl font-bold text-primary">
-              {chars[currentCharIndex]}
+              {currentCharIndex + 1}
             </div>
             <p className="text-xs text-muted-foreground">
-              Expected: <span className="font-mono">{MORSE_CODE[chars[currentCharIndex]]}</span>
+              Character {currentCharIndex + 1} of {EXAM_COUNT}
             </p>
           </div>
 
@@ -137,7 +187,9 @@ export default function WriteExamPage() {
           <div className="mb-4 flex items-center justify-center">
             <div className="flex h-12 min-w-[120px] items-center justify-center rounded-lg border bg-background px-4">
               <span className="font-mono text-2xl tracking-widest text-foreground">
-                {morseInput || <span className="text-muted-foreground text-sm">...</span>}
+                {morseInput || (
+                  <span className="text-muted-foreground text-sm">...</span>
+                )}
               </span>
             </div>
           </div>
@@ -162,7 +214,9 @@ export default function WriteExamPage() {
             </Button>
           </div>
           <p className="mt-3 text-center text-xs text-muted-foreground">
-            Pause to auto-submit character
+            Pause to auto-submit &middot;{" "}
+            <kbd className="rounded bg-muted px-1 py-0.5 text-xs font-mono border">q</kbd>/<kbd className="rounded bg-muted px-1 py-0.5 text-xs font-mono border">.</kbd> dot{" "}
+            <kbd className="rounded bg-muted px-1 py-0.5 text-xs font-mono border">w</kbd>/<kbd className="rounded bg-muted px-1 py-0.5 text-xs font-mono border">-</kbd> dash
           </p>
         </div>
       )}
@@ -175,15 +229,21 @@ export default function WriteExamPage() {
 
           <div className="mb-6 grid grid-cols-3 gap-4">
             <div className="flex flex-col items-center rounded-lg bg-muted p-4">
-              <span className="text-2xl font-bold text-foreground">{accuracy}%</span>
+              <span className="text-2xl font-bold text-foreground">
+                {accuracy}%
+              </span>
               <span className="text-xs text-muted-foreground">Accuracy</span>
             </div>
             <div className="flex flex-col items-center rounded-lg bg-muted p-4">
-              <span className="text-2xl font-bold text-foreground">{timeSpent}s</span>
+              <span className="text-2xl font-bold text-foreground">
+                {timeSpent}s
+              </span>
               <span className="text-xs text-muted-foreground">Time</span>
             </div>
             <div className="flex flex-col items-center rounded-lg bg-muted p-4">
-              <span className="text-2xl font-bold text-foreground">{wpm}</span>
+              <span className="text-2xl font-bold text-foreground">
+                {wpmScore}
+              </span>
               <span className="text-xs text-muted-foreground">WPM</span>
             </div>
           </div>

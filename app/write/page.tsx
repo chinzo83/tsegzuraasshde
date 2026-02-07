@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { getRandomChars, MORSE_CODE, REVERSE_MORSE } from "@/lib/morse"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -13,9 +13,13 @@ export default function WritePage() {
   const [chars, setChars] = useState<string[]>([])
   const [currentCharIndex, setCurrentCharIndex] = useState(0)
   const [morseInput, setMorseInput] = useState("")
-  const [results, setResults] = useState<Array<{ char: string; input: string; decoded: string; correct: boolean }>>([])
+  const [results, setResults] = useState<
+    Array<{ char: string; input: string; decoded: string; correct: boolean }>
+  >([])
   const [started, setStarted] = useState(false)
   const [roundComplete, setRoundComplete] = useState(false)
+  const [startTime, setStartTime] = useState(0)
+  const [endTime, setEndTime] = useState(0)
   const gapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const startRound = useCallback(() => {
@@ -26,6 +30,7 @@ export default function WritePage() {
     setResults([])
     setRoundComplete(false)
     setStarted(true)
+    setStartTime(Date.now())
   }, [])
 
   const addSymbol = useCallback(
@@ -35,7 +40,6 @@ export default function WritePage() {
 
       if (gapTimerRef.current) clearTimeout(gapTimerRef.current)
 
-      // Auto-submit after a pause (character gap)
       gapTimerRef.current = setTimeout(() => {
         setMorseInput((prev) => {
           const decoded = REVERSE_MORSE[prev] || "?"
@@ -49,6 +53,7 @@ export default function WritePage() {
 
           if (currentCharIndex + 1 >= chars.length) {
             setRoundComplete(true)
+            setEndTime(Date.now())
           } else {
             setCurrentCharIndex((i) => i + 1)
           }
@@ -60,6 +65,43 @@ export default function WritePage() {
     [chars, currentCharIndex, roundComplete]
   )
 
+  // Keyboard support: q or . for dot, w or - for dash
+  useEffect(() => {
+    if (!started || roundComplete) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "q" || e.key === "." || e.key === "Q") {
+        e.preventDefault()
+        addSymbol(".")
+      } else if (e.key === "w" || e.key === "-" || e.key === "W") {
+        e.preventDefault()
+        addSymbol("-")
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [started, roundComplete, addSymbol])
+
+  const accuracy =
+    results.length > 0
+      ? Math.round(
+          (results.filter((r) => r.correct).length / results.length) * 100
+        )
+      : 0
+
+  const timeSpent =
+    endTime && startTime ? ((endTime - startTime) / 1000).toFixed(1) : "0"
+
+  const avgScore =
+    results.length > 0
+      ? Math.round(
+          (accuracy +
+            Math.min(100, (results.filter((r) => r.correct).length / ((endTime - startTime) / 1000)) * 20)) /
+            2
+        )
+      : 0
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
       <div className="mb-8 text-center">
@@ -68,7 +110,7 @@ export default function WritePage() {
         </div>
         <h1 className="text-3xl font-bold text-foreground">Write</h1>
         <p className="mt-1 text-muted-foreground">
-          Practice encoding letters into Morse code
+          Practice encoding into Morse code
         </p>
       </div>
 
@@ -92,8 +134,18 @@ export default function WritePage() {
         {!started ? (
           <div className="flex flex-col items-center gap-4 py-8">
             <p className="text-muted-foreground">
-              You will see letters. Encode each one in Morse using dot and dash buttons.
+              System shows random characters. Encode each one in Morse code.
             </p>
+            <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Keyboard shortcuts</p>
+              <p>
+                <kbd className="rounded bg-background px-1.5 py-0.5 text-xs font-mono border">q</kbd> or{" "}
+                <kbd className="rounded bg-background px-1.5 py-0.5 text-xs font-mono border">.</kbd> = dot
+                &nbsp;&nbsp;
+                <kbd className="rounded bg-background px-1.5 py-0.5 text-xs font-mono border">w</kbd> or{" "}
+                <kbd className="rounded bg-background px-1.5 py-0.5 text-xs font-mono border">-</kbd> = dash
+              </p>
+            </div>
             <Button onClick={startRound} className="gap-2">
               <PenTool className="h-4 w-4" />
               Start
@@ -101,7 +153,7 @@ export default function WritePage() {
           </div>
         ) : (
           <>
-            {/* Character display */}
+            {/* Character progress - NO expected char revealed, just progress indicator */}
             <div className="mb-6 flex items-center justify-center gap-3">
               {chars.map((c, i) => (
                 <div
@@ -117,7 +169,14 @@ export default function WritePage() {
                         : "border-border bg-muted text-muted-foreground"
                   )}
                 >
-                  {c}
+                  {/* Only show the letter AFTER it's been answered */}
+                  {results[i] ? (
+                    <span>{c}</span>
+                  ) : i === currentCharIndex ? (
+                    <span className="text-sm">{i + 1}</span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground/40">{i + 1}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -127,14 +186,13 @@ export default function WritePage() {
                 {/* Current Morse input display */}
                 <div className="flex h-12 min-w-[120px] items-center justify-center rounded-lg border bg-background px-4">
                   <span className="font-mono text-2xl tracking-widest text-foreground">
-                    {morseInput || <span className="text-muted-foreground text-sm">...</span>}
+                    {morseInput || (
+                      <span className="text-muted-foreground text-sm">...</span>
+                    )}
                   </span>
                 </div>
 
-                {/* Expected Morse */}
-                <p className="text-xs text-muted-foreground">
-                  Expected: <span className="font-mono">{MORSE_CODE[chars[currentCharIndex]]}</span>
-                </p>
+                {/* NO expected Morse hint - anti-cheat */}
 
                 {/* Dot and Dash buttons */}
                 <div className="flex items-center gap-4">
@@ -157,13 +215,37 @@ export default function WritePage() {
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  Pause to auto-submit character
+                  Pause to auto-submit &middot;{" "}
+                  <kbd className="rounded bg-muted px-1 py-0.5 text-xs font-mono border">q</kbd>/<kbd className="rounded bg-muted px-1 py-0.5 text-xs font-mono border">.</kbd> dot{" "}
+                  <kbd className="rounded bg-muted px-1 py-0.5 text-xs font-mono border">w</kbd>/<kbd className="rounded bg-muted px-1 py-0.5 text-xs font-mono border">-</kbd> dash
                 </p>
               </div>
             )}
 
             {roundComplete && (
               <div className="flex flex-col items-center gap-4">
+                {/* Stats */}
+                <div className="grid w-full max-w-sm grid-cols-3 gap-3">
+                  <div className="flex flex-col items-center rounded-lg bg-muted p-3">
+                    <span className="text-xl font-bold text-foreground">
+                      {timeSpent}s
+                    </span>
+                    <span className="text-xs text-muted-foreground">Time</span>
+                  </div>
+                  <div className="flex flex-col items-center rounded-lg bg-muted p-3">
+                    <span className="text-xl font-bold text-foreground">
+                      {accuracy}%
+                    </span>
+                    <span className="text-xs text-muted-foreground">Accuracy</span>
+                  </div>
+                  <div className="flex flex-col items-center rounded-lg bg-muted p-3">
+                    <span className="text-xl font-bold text-foreground">
+                      {avgScore}
+                    </span>
+                    <span className="text-xs text-muted-foreground">Avg Score</span>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-3">
                   {results.map((r, i) => (
                     <div key={i} className="flex flex-col items-center gap-1">
@@ -182,10 +264,15 @@ export default function WritePage() {
                   ))}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {results.filter((r) => r.correct).length}/{results.length} correct
+                  {results.filter((r) => r.correct).length}/{results.length}{" "}
+                  correct
                 </p>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={startRound} className="gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={startRound}
+                    className="gap-2"
+                  >
                     <RotateCcw className="h-4 w-4" />
                     New Round
                   </Button>
